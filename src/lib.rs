@@ -1,14 +1,17 @@
 //! A simple and fast random number generator.
 //!
-//! The implementation uses [Wyrand](https://github.com/wangyi-fudan/wyhash), a simple and fast
-//! generator but **not** cryptographically secure.
+//! This is a fork of [`fastrand`](https://docs.rs/fastrand) exposing the identical API, but
+//! backed by the AEGIS-128X4 stream cipher (via `rand_aegis`/`aegis_rng`) instead of
+//! [Wyrand](https://github.com/wangyi-fudan/wyhash) -- see that crate's docs for the small set
+//! of API deviations this swap requires (`with_seed` is no longer `const`, `get_seed` is
+//! removed, and `PartialEq`/`Eq` compare AEGIS-128X4 state instead of a raw `u64`).
 //!
 //! # Examples
 //!
 //! Flip a coin:
 //!
 //! ```
-//! if fastrand::bool() {
+//! if fastrand_conservative::bool() {
 //!     println!("heads");
 //! } else {
 //!     println!("tails");
@@ -18,22 +21,22 @@
 //! Generate a random `i32`:
 //!
 //! ```
-//! let num = fastrand::i32(..);
+//! let num = fastrand_conservative::i32(..);
 //! ```
 //!
 //! Choose a random element in an array:
 //!
 //! ```
 //! let v = vec![1, 2, 3, 4, 5];
-//! let i = fastrand::usize(..v.len());
+//! let i = fastrand_conservative::usize(..v.len());
 //! let elem = v[i];
 //! ```
 //!
 //! Sample values from an array with `O(n)` complexity (`n` is the length of the array):
 //!
 //! ```
-//! fastrand::choose_multiple([1, 4, 5], 2);
-//! fastrand::choose_multiple(0..20, 12);
+//! fastrand_conservative::choose_multiple([1, 4, 5], 2);
+//! fastrand_conservative::choose_multiple(0..20, 12);
 //! ```
 //!
 //!
@@ -41,7 +44,7 @@
 //!
 //! ```
 //! let mut v = vec![1, 2, 3, 4, 5];
-//! fastrand::shuffle(&mut v);
+//! fastrand_conservative::shuffle(&mut v);
 //! ```
 //!
 //! Generate a random [`Vec`] or [`String`](alloc::string::String):
@@ -49,18 +52,18 @@
 //! ```
 //! use std::iter::repeat_with;
 //!
-//! let v: Vec<i32> = repeat_with(|| fastrand::i32(..)).take(10).collect();
-//! let s: String = repeat_with(fastrand::alphanumeric).take(10).collect();
+//! let v: Vec<i32> = repeat_with(|| fastrand_conservative::i32(..)).take(10).collect();
+//! let s: String = repeat_with(fastrand_conservative::alphanumeric).take(10).collect();
 //! ```
 //!
 //! To get reproducible results on every run, initialize the generator with a seed:
 //!
 //! ```
 //! // Pick an arbitrary number as seed.
-//! fastrand::seed(7);
+//! fastrand_conservative::seed(7);
 //!
 //! // Now this prints the same number on every run:
-//! println!("{}", fastrand::u32(..));
+//! println!("{}", fastrand_conservative::u32(..));
 //! ```
 //!
 //! To be more efficient, create a new [`Rng`] instance instead of using the thread-local
@@ -69,7 +72,7 @@
 //! ```
 //! use std::iter::repeat_with;
 //!
-//! let mut rng = fastrand::Rng::new();
+//! let mut rng = fastrand_conservative::Rng::new();
 //! let mut bytes: Vec<u8> = repeat_with(|| rng.u8(..)).take(10_000).collect();
 //! ```
 //!
@@ -117,6 +120,8 @@ extern crate std;
 use core::convert::{TryFrom, TryInto};
 use core::ops::{Bound, RangeBounds};
 
+use rand_core::{RngCore, SeedableRng};
+
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
@@ -126,14 +131,14 @@ mod global_rng;
 #[cfg(feature = "std")]
 pub use global_rng::*;
 
-/// A random number generator.
+/// A random number generator, backed by AEGIS-128X4 (see the crate docs).
 #[derive(Debug, PartialEq, Eq)]
-pub struct Rng(u64);
+pub struct Rng(rand_aegis::Rng);
 
 impl Clone for Rng {
     /// Clones the generator by creating a new generator with the same seed.
     fn clone(&self) -> Rng {
-        Rng::with_seed(self.0)
+        Rng(self.0.clone())
     }
 }
 
@@ -141,21 +146,13 @@ impl Rng {
     /// Generates a random `u32`.
     #[inline]
     fn gen_u32(&mut self) -> u32 {
-        self.gen_u64() as u32
+        self.0.next_u32()
     }
 
     /// Generates a random `u64`.
     #[inline]
     fn gen_u64(&mut self) -> u64 {
-        // Constants for WyRand taken from: https://github.com/wangyi-fudan/wyhash/blob/master/wyhash.h#L151
-        // Updated for the final v4.2 implementation with improved constants for better entropy output.
-        const WY_CONST_0: u64 = 0x2d35_8dcc_aa6c_78a5;
-        const WY_CONST_1: u64 = 0x8bb8_4b93_962e_acc9;
-
-        let s = self.0.wrapping_add(WY_CONST_0);
-        self.0 = s;
-        let t = u128::from(s) * u128::from(s ^ WY_CONST_1);
-        (t as u64) ^ (t >> 64) as u64
+        self.0.next_u64()
     }
 
     /// Generates a random `u128`.
@@ -285,12 +282,21 @@ macro_rules! rng_integer {
     };
 }
 
+/// Derives a 128-bit AEGIS-128X4 key and 128-bit IV from a `u64` seed (pure
+/// function of `seed`).
+fn seed_to_aegis_seed(seed: u64) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    out[0..16].copy_from_slice(&(seed as u128).to_le_bytes());
+    out[16..32].copy_from_slice(&(!seed as u128).to_le_bytes());
+    out
+}
+
 impl Rng {
     /// Creates a new random number generator with the initial seed.
     #[inline]
-    #[must_use = "this creates a new instance of `Rng`; if you want to initialize the thread-local generator, use `fastrand::seed()` instead"]
-    pub const fn with_seed(seed: u64) -> Self {
-        Rng(seed)
+    #[must_use = "this creates a new instance of `Rng`; if you want to initialize the thread-local generator, use `fastrand_conservative::seed()` instead"]
+    pub fn with_seed(seed: u64) -> Self {
+        Rng(rand_aegis::Rng::from_seed(seed_to_aegis_seed(seed)))
     }
 
     /// Clones the generator by deterministically deriving a new generator based on the initial
@@ -304,10 +310,10 @@ impl Rng {
     ///
     /// ```
     /// // Seed two generators equally, and clone both of them.
-    /// let mut base1 = fastrand::Rng::with_seed(0x4d595df4d0f33173);
+    /// let mut base1 = fastrand_conservative::Rng::with_seed(0x4d595df4d0f33173);
     /// base1.bool(); // Use the generator once.
     ///
-    /// let mut base2 = fastrand::Rng::with_seed(0x4d595df4d0f33173);
+    /// let mut base2 = fastrand_conservative::Rng::with_seed(0x4d595df4d0f33173);
     /// base2.bool(); // Use the generator once.
     ///
     /// let mut rng1 = base1.fork();
@@ -379,10 +385,7 @@ impl Rng {
         //
         // There is still some remaining bias in the int-to-float conversion, because
         // nonzero numbers <=2^(-64) are never generated, even though they are
-        // expressible in f32. However, at this point the bias in int-to-float conversion
-        // is no larger than the bias in the underlying WyRand generator: since it only
-        // has a 64-bit state, it necessarily already have biases of at least 2^(-64)
-        // probability.
+        // expressible in f32. This bias is negligible (at most 2^(-64) probability).
         //
         // See e.g. Section 3.1 of Thomas, David B., et al. "Gaussian random number generators,
         // https://www.doc.ic.ac.uk/~wl/papers/07/csur07dt.pdf, for background.
@@ -539,13 +542,7 @@ impl Rng {
     /// Initializes this generator with the given seed.
     #[inline]
     pub fn seed(&mut self, seed: u64) {
-        self.0 = seed;
-    }
-
-    /// Gives back **current** seed that is being held by this generator.
-    #[inline]
-    pub fn get_seed(&self) -> u64 {
-        self.0
+        *self = Self::with_seed(seed);
     }
 
     /// Choose an item from an iterator at random.
@@ -582,8 +579,8 @@ impl Rng {
     /// Fill a byte slice with random data.
     #[inline]
     pub fn fill(&mut self, slice: &mut [u8]) {
-        // We fill the slice by chunks of 8 bytes, or one block of
-        // WyRand output per new state.
+        // We fill the slice by chunks of 8 bytes, one `gen_u64()` word at a
+        // time.
         let mut chunks = slice.chunks_exact_mut(core::mem::size_of::<u64>());
         for chunk in chunks.by_ref() {
             let n = self.gen_u64().to_ne_bytes();

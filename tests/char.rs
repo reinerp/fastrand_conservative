@@ -10,7 +10,7 @@ where
     let all: HashSet<char> = range.clone().collect();
     let mut covered = HashSet::new();
     for _ in 0..n {
-        let c = fastrand::char(range.clone());
+        let c = fastrand_conservative::char(range.clone());
         assert!(all.contains(&c));
         covered.insert(c);
     }

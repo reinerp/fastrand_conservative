@@ -7,29 +7,29 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 #[test]
 fn bool() {
     for x in &[false, true] {
-        while fastrand::bool() != *x {}
+        while fastrand_conservative::bool() != *x {}
     }
 }
 
 #[test]
 fn u8() {
     for x in 0..10 {
-        while fastrand::u8(..10) != x {}
+        while fastrand_conservative::u8(..10) != x {}
     }
 
     for x in 200..=u8::MAX {
-        while fastrand::u8(200..) != x {}
+        while fastrand_conservative::u8(200..) != x {}
     }
 }
 
 #[test]
 fn i8() {
     for x in -128..-120 {
-        while fastrand::i8(..-120) != x {}
+        while fastrand_conservative::i8(..-120) != x {}
     }
 
     for x in 120..=127 {
-        while fastrand::i8(120..) != x {}
+        while fastrand_conservative::i8(120..) != x {}
     }
 }
 
@@ -40,7 +40,7 @@ fn u32() {
         let n = n.wrapping_mul(n);
         if n != 0 {
             for _ in 0..1000 {
-                assert!(fastrand::u32(..n) < n);
+                assert!(fastrand_conservative::u32(..n) < n);
             }
         }
     }
@@ -54,7 +54,7 @@ fn u64() {
         let n = n.wrapping_mul(n);
         if n != 0 {
             for _ in 0..1000 {
-                assert!(fastrand::u64(..n) < n);
+                assert!(fastrand_conservative::u64(..n) < n);
             }
         }
     }
@@ -69,7 +69,7 @@ fn u128() {
         let n = n.wrapping_mul(n);
         if n != 0 {
             for _ in 0..1000 {
-                assert!(fastrand::u128(..n) < n);
+                assert!(fastrand_conservative::u128(..n) < n);
             }
         }
     }
@@ -77,7 +77,7 @@ fn u128() {
 
 #[test]
 fn f32() {
-    let mut r = fastrand::Rng::with_seed(0);
+    let mut r = fastrand_conservative::Rng::with_seed(0);
     let tiny = (-24.0f32).exp2();
     let mut count_tiny_nonzero = 0;
     let mut count_top_half = 0;
@@ -96,7 +96,7 @@ fn f32() {
 
 #[test]
 fn f32_inclusive() {
-    let mut r = fastrand::Rng::with_seed(0);
+    let mut r = fastrand_conservative::Rng::with_seed(0);
     let tiny = (-24.0f32).exp2();
     let mut count_top_half = 0;
     let mut count_tiny_nonzero = 0;
@@ -119,7 +119,7 @@ fn f32_inclusive() {
 
 #[test]
 fn f64() {
-    let mut r = fastrand::Rng::with_seed(0);
+    let mut r = fastrand_conservative::Rng::with_seed(0);
     let mut count_top_half = 0;
     for _ in 0..100_000_000 {
         let x = r.f64();
@@ -133,7 +133,7 @@ fn f64() {
 
 #[test]
 fn f64_inclusive() {
-    let mut r = fastrand::Rng::with_seed(0);
+    let mut r = fastrand_conservative::Rng::with_seed(0);
     let mut count_top_half = 0;
     for _ in 0..100_000_000 {
         let x = r.f64_inclusive();
@@ -148,7 +148,7 @@ fn f64_inclusive() {
 #[test]
 fn digit() {
     for base in 1..36 {
-        let result = fastrand::digit(base);
+        let result = fastrand_conservative::digit(base);
         assert!(result.is_ascii_digit() || result.is_ascii_lowercase());
     }
 }
@@ -158,14 +158,14 @@ fn global_rng_choice() {
     let items = [1, 4, 9, 5, 2, 3, 6, 7, 8, 0];
 
     for item in &items {
-        while fastrand::choice(&items).unwrap() != item {}
+        while fastrand_conservative::choice(&items).unwrap() != item {}
     }
 }
 
 #[test]
 fn global_rng_alphabetic() {
     for _ in 0..1000 {
-        let result = fastrand::alphabetic();
+        let result = fastrand_conservative::alphabetic();
         assert!(result.is_ascii_alphabetic())
     }
 }
@@ -173,7 +173,7 @@ fn global_rng_alphabetic() {
 #[test]
 fn global_rng_lowercase() {
     for _ in 0..1000 {
-        let result = fastrand::lowercase();
+        let result = fastrand_conservative::lowercase();
         assert!(result.is_ascii_lowercase())
     }
 }
@@ -181,14 +181,14 @@ fn global_rng_lowercase() {
 #[test]
 fn global_rng_uppercase() {
     for _ in 0..1000 {
-        let result = fastrand::uppercase();
+        let result = fastrand_conservative::uppercase();
         assert!(result.is_ascii_uppercase())
     }
 }
 
 #[test]
 fn fill() {
-    let mut r = fastrand::Rng::new();
+    let mut r = fastrand_conservative::Rng::new();
     let mut a = [0u8; 64];
     let mut b = [0u8; 64];
 
@@ -211,15 +211,15 @@ fn global_rng_fill() {
     let mut a = [0u8; 64];
     let mut b = [0u8; 64];
 
-    fastrand::fill(&mut a);
-    fastrand::fill(&mut b);
+    fastrand_conservative::fill(&mut a);
+    fastrand_conservative::fill(&mut b);
 
     assert_ne!(a, b);
 }
 
 #[test]
 fn rng() {
-    let mut r = fastrand::Rng::new();
+    let mut r = fastrand_conservative::Rng::new();
 
     assert_ne!(r.u64(..), r.u64(..));
 
@@ -232,8 +232,8 @@ fn rng() {
 
 #[test]
 fn rng_init() {
-    let mut a = fastrand::Rng::new();
-    let mut b = fastrand::Rng::new();
+    let mut a = fastrand_conservative::Rng::new();
+    let mut b = fastrand_conservative::Rng::new();
     assert_ne!(a.u64(..), b.u64(..));
 
     a.seed(7);
@@ -243,7 +243,7 @@ fn rng_init() {
 
 #[test]
 fn rng_digit() {
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
     for base in 1..36 {
         let result = rng.digit(base);
         assert!(result.is_ascii_digit() || result.is_ascii_lowercase());
@@ -253,29 +253,29 @@ fn rng_digit() {
 #[test]
 #[should_panic]
 fn rng_digit_panic_1() {
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
     let _result = rng.digit(0);
 }
 
 #[test]
 #[should_panic]
 fn rng_digit_panic_2() {
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
     let base = rng.u32(37..);
     let _result = rng.digit(base);
 }
 
 #[test]
 fn with_seed() {
-    let mut a = fastrand::Rng::with_seed(7);
-    let mut b = fastrand::Rng::new();
+    let mut a = fastrand_conservative::Rng::with_seed(7);
+    let mut b = fastrand_conservative::Rng::new();
     b.seed(7);
     assert_eq!(a.u64(..), b.u64(..));
 }
 
 #[test]
 fn choose_multiple() {
-    let mut a = fastrand::Rng::new();
+    let mut a = fastrand_conservative::Rng::new();
     let mut elements = (0..20).collect::<Vec<_>>();
 
     while !elements.is_empty() {
@@ -293,7 +293,7 @@ fn choose_multiple() {
 #[test]
 fn choice() {
     let items = [1, 4, 9, 5, 2, 3, 6, 7, 8, 0];
-    let mut r = fastrand::Rng::new();
+    let mut r = fastrand_conservative::Rng::new();
 
     for item in &items {
         while r.choice(&items).unwrap() != item {}
@@ -302,7 +302,7 @@ fn choice() {
 
 #[test]
 fn choice_empty() {
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
     let data: Vec<i32> = Vec::new();
     let result = rng.choice(data);
     assert!(result.is_none());
@@ -310,7 +310,7 @@ fn choice_empty() {
 
 #[test]
 fn lowercase() {
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
     for _ in 0..1000 {
         let result = rng.lowercase();
         assert!(result.is_ascii_lowercase())
@@ -319,7 +319,7 @@ fn lowercase() {
 
 #[test]
 fn alphabetic() {
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
     for _ in 0..1000 {
         let result = rng.alphabetic();
         assert!(result.is_ascii_alphabetic())
@@ -328,7 +328,7 @@ fn alphabetic() {
 
 #[test]
 fn uppercase() {
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
     for _ in 0..1000 {
         let result = rng.uppercase();
         assert!(result.is_ascii_uppercase())
@@ -338,14 +338,14 @@ fn uppercase() {
 #[test]
 #[should_panic]
 fn char_panic() {
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
     let _result = rng.char('z'..='a');
 }
 
 #[test]
 fn char() {
     use core::ops::Bound;
-    let mut rng = fastrand::Rng::new();
+    let mut rng = fastrand_conservative::Rng::new();
 
     let result = rng.char(..);
     assert!(result >= 0 as char && result <= core::char::MAX);

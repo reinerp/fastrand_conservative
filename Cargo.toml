@@ -1,5 +1,5 @@
 [package]
-name = "fastrand"
+name = "fastrand_conservative"
 # When publishing a new version:
 # - Update CHANGELOG.md
 # - Create "v2.x.y" git tag
@@ -7,10 +7,10 @@ version = "2.4.1"
 authors = ["Stjepan Glavina <stjepang@gmail.com>"]
 edition = "2018"
 rust-version = "1.63"
-description = "A simple and fast random number generator"
+description = "fastrand's API, backed by the AEGIS-128X4 stream cipher instead of Wyrand"
 license = "Apache-2.0 OR MIT"
-repository = "https://github.com/smol-rs/fastrand"
-keywords = ["simple", "fast", "rand", "random", "wyrand"]
+repository = "https://github.com/reinerp/fastrand_conservative"
+keywords = ["simple", "fast", "rand", "random", "aegis"]
 categories = ["algorithms"]
 exclude = ["/.*"]
 
@@ -19,6 +19,10 @@ default = ["std"]
 alloc = []
 std = ["alloc"]
 js = ["std", "getrandom"]
+
+[dependencies]
+rand_aegis = { path = "../rand_aegis" }
+rand_core = "0.9"
 
 [target.'cfg(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.3.4", features = ["wasm_js"], optional = true }
